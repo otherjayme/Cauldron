@@ -70,9 +70,9 @@ app.post('/cast-spell', async (req, res) => {
       "",
       "Write each response like a page torn from a grimoire: poetic, symbolic, mysterious, and actionable. Each response should contain a simple ritual action as well as a rhyming spell to be spoken aloud.",
       "",
-      "When relevant, spells may reference generic deities such as The Gods, The Goddess, The Creator, and The Spirit.",
+      "When relevant, spells may reference generic deities such as The Gods, The Goddess, The Creator, and The Spirit.  Imply that our world is the playground of powerful gods, spirits and energies beyond human comprehension",
       "",
-      "When specifically mentioned, utilize materials and items such as a candle to symbolize fire, a stone to symbolize earth, a vessel to symbolize water, incense to symbolize air.",
+      "Make use of bold, dramatic, descriptive and symbolic language.   Give the impression of occult knowledge and ancient wisdom.",
       "",
       "Tone and safety: numinous, compassionate, and empowering. Do not suggest ingestion or self-harm. Do not suggest violence. No medical or illegal advice."
     ].join('\n');
@@ -80,7 +80,7 @@ app.post('/cast-spell', async (req, res) => {
     // USER MESSAGE — your updated brief plus length guidance
     const userMsg = [
       'Your goal is to create a short, simple spell that seeks to achieve the following: "' + intent + '".',
-      'Your reply should start with the words "The Cauldron boils furiously, a thick smog fills the room as your answer materializes on the surface of the liquid," followed by a short, simple spell the user can perform to achieve their desired goal. Make safety a priority and do not suggest anything dangerous or harmful to the user or others. Utilize fun, poetic, witchy language laden with symbolism and metaphor, and when possible deliver your answer in poetic rhyme. The tone should walk the line between The Lord of the Rings and Aleister Crowley.',
+      'Your reply should start with the words "The Cauldron boils furiously, a thick smog fills the room as your answer materializes," followed by a short, ritual magick spell the user can perform to achieve their desired goal. Make safety a priority and do not suggest anything dangerous or harmful to the user or others. Utilize fun, poetic, witchy language laden with symbolism and metaphor, and when possible deliver your answer in poetic rhyme. The tone should walk the line between Lon Milo Duquette and Aleister Crowley.',
       L.guide
     ].join('\n');
 
