@@ -18,7 +18,22 @@ if (!process.env.OPENAI_API_KEY) {
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Middleware
-app.use(cors());
+// CORS allow-list: only let your frontends call the API
+const allowedOrigins = new Set([
+  'https://https://comforting-bombolone-26bfb7.netlify.app/',
+  'https://cauldron.online',
+]);
+
+app.use(cors({
+  origin(origin, callback) {
+    // allow non-browser tools (no Origin header) like curl/Postman/Render health checks
+    if (!origin) return callback(null, true);
+    return callback(null, allowedOrigins.has(origin));
+  },
+  methods: ['GET','POST'],
+  allowedHeaders: ['Content-Type']
+}));
+
 app.use(express.json());
 app.use((req, _res, next) => {
   console.log('[' + new Date().toISOString() + '] ' + req.method + ' ' + req.url);
@@ -88,15 +103,16 @@ app.post('/cast-spell', async (req, res) => {
 
     res.json({ spell });
   } catch (e) {
-    const log = {
-      at: '/cast-spell (chat)',
-      status: e && (e.status || (e.response && e.response.status)),
-      message: e && e.message,
-      data: (e && e.response && e.response.data) || null
-    };
-    console.error('Chat error -> ' + JSON.stringify(log, null, 2));
-    res.status(500).json({ error: (log.data && log.data.error && log.data.error.message) || 'OpenAI whisper failed.' });
-  }
+  const log = {
+    at: '/cast-spell (chat)',
+    status: e?.status || e?.response?.status,
+    message: e?.message,
+    data: e?.response?.data || null
+  };
+  console.error('Chat error ->', log);
+  res.status(500).json({ error: log.data?.error?.message || log.message || 'OpenAI error' });
+}
+
 });
 
 // Subscribe route (ASCII-safe)
@@ -129,7 +145,14 @@ app.post('/subscribe', (req, res) => {
   }
 });
 
-// Start server
-app.listen(port, () => {
-  console.log('Cauldron server brewing at http://localhost:' + port);
+// Start server (uses env PORT if provided; falls back to 3000)
+const PORT = process.env.PORT || 3000;
+
+// If a host ever requires binding to all interfaces, add the second arg:
+// const server = app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, () => {
+  const addr = server.address();
+  const actualPort = typeof addr === 'string' ? addr : addr?.port;
+  console.log(`Cauldron server brewing on port ${actualPort}`);
 });
+
