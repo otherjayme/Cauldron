@@ -50,7 +50,7 @@ app.post('/cast-spell', async (req, res) => {
   try {
     const body = req.body || {};
     const intent = (body.intent || '').trim();
-    const length = (body.length || 'long').toLowerCase();
+    const length = (body.length || 'medium').toLowerCase();
 
     if (!intent) {
       return res.status(400).json({ error: 'No intention provided.' });
@@ -58,9 +58,9 @@ app.post('/cast-spell', async (req, res) => {
 
     // Length presets
     const lengthConfig = {
-      long:   { max_tokens: 260, guide: 'Length about 150 to 220 words.' },
-      medium: { max_tokens: 140, guide: 'Length about 75 to 110 words.' },
-      short:  { max_tokens:  80, guide: 'Length about 35 to 55 words.' }
+      long:   { max_tokens: 260, guide: 'Length about 75 to 110 words.' },
+      medium: { max_tokens: 140, guide: 'Length about 45 to 65 words.' },
+      short:  { max_tokens:  80, guide: 'Length about 25 to 35 words.' }
     };
     const L = lengthConfig[length] || lengthConfig.long;
 
