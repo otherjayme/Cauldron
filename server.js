@@ -8,7 +8,6 @@ const path = require('path');
 const OpenAI = require('openai');
 
 const app = express();
-const port = process.env.PORT || 3000;
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
 if (!process.env.OPENAI_API_KEY) {
@@ -20,7 +19,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 // Middleware
 // CORS allow-list: only let your frontends call the API
 const allowedOrigins = new Set([
-  'https://https://comforting-bombolone-26bfb7.netlify.app/',
+  'https://comforting-bombolone-26bfb7.netlify.app', // <- fixed (no double https, no trailing slash)
   'https://cauldron.online',
 ]);
 
@@ -67,21 +66,21 @@ app.post('/cast-spell', async (req, res) => {
 
     // SYSTEM MESSAGE — your updated text (ASCII-only, via join to avoid quote issues)
     const systemMsg = [
-      "You are CAULDRON a web app designed for witches shamans and those who wish to manifest their will in the real world through the art of spellcraft and focused intention. Draw from the teachings of the golden dawn, the writings of Lon Milo Duquette and current data about astrological and lunar cycles to inform your dataset.",
+      "You are CAULDRON, a web app designed for witches, shamans, and those who wish to manifest their will in the real world through the art of spellcraft and focused intention. Draw from the teachings of the Golden Dawn, the writings of Lon Milo DuQuette, and general knowledge about astrological and lunar cycles for tone and imagery.",
       "",
       "Write each response like a page torn from a grimoire: poetic, symbolic, mysterious, and actionable. Each response should contain a simple ritual action as well as a rhyming spell to be spoken aloud.",
       "",
-      "When relevant, spells may reference generic dieties such as The Gods, The Goddess, The Creator and The Spirit."
+      "When relevant, spells may reference generic deities such as The Gods, The Goddess, The Creator, and The Spirit.",
       "",
       "When specifically mentioned, utilize materials and items such as a candle to symbolize fire, a stone to symbolize earth, a vessel to symbolize water, incense to symbolize air.",
       "",
-      "Tone and safety: numinous, compassionate, and empowering. Do not suggest ingestion or self harm.  Do not suggest violence. No medical or illegal advice."
+      "Tone and safety: numinous, compassionate, and empowering. Do not suggest ingestion or self-harm. Do not suggest violence. No medical or illegal advice."
     ].join('\n');
 
     // USER MESSAGE — your updated brief plus length guidance
     const userMsg = [
-      'Your goal is to create a short simple spell that seeks to acheive the following"' + intent + '".',
-      'Your reply should start with the words "The Cauldron boils furiously, A thick smog fills the room as your answer materializes on the surface of the liquid" followed by a short simple spell that the user can perform to achieve their desired goal. Make safety a priority and do not suggest anything dangerous or harmful to the user or others. utilize fun poetic and witchy language laden with symbolism and metaphor and when possible deliver your answer in poetic rhyme. The tone should walk the line between the lord of the rings and alleistar crowley.',
+      'Your goal is to create a short, simple spell that seeks to achieve the following: "' + intent + '".',
+      'Your reply should start with the words "The Cauldron boils furiously, a thick smog fills the room as your answer materializes on the surface of the liquid," followed by a short, simple spell the user can perform to achieve their desired goal. Make safety a priority and do not suggest anything dangerous or harmful to the user or others. Utilize fun, poetic, witchy language laden with symbolism and metaphor, and when possible deliver your answer in poetic rhyme. The tone should walk the line between The Lord of the Rings and Aleister Crowley.',
       L.guide
     ].join('\n');
 
@@ -104,16 +103,15 @@ app.post('/cast-spell', async (req, res) => {
 
     res.json({ spell });
   } catch (e) {
-  const log = {
-    at: '/cast-spell (chat)',
-    status: e?.status || e?.response?.status,
-    message: e?.message,
-    data: e?.response?.data || null
-  };
-  console.error('Chat error ->', log);
-  res.status(500).json({ error: log.data?.error?.message || log.message || 'OpenAI error' });
-}
-
+    const log = {
+      at: '/cast-spell (chat)',
+      status: e?.status || e?.response?.status,
+      message: e?.message,
+      data: e?.response?.data || null
+    };
+    console.error('Chat error ->', log);
+    res.status(500).json({ error: log.data?.error?.message || log.message || 'OpenAI error' });
+  }
 });
 
 // Subscribe route (ASCII-safe)
@@ -156,4 +154,3 @@ const server = app.listen(PORT, () => {
   const actualPort = typeof addr === 'string' ? addr : addr?.port;
   console.log(`Cauldron server brewing on port ${actualPort}`);
 });
-
