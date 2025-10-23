@@ -7,8 +7,18 @@ const fs = require('fs');
 const path = require('path');
 const OpenAI = require('openai');
 
+// --- Database setup ---
+const { Pool } = require('pg');
+const db = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
+
+
 const app = express();
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const PROMPT_VERSION = 'v1.3-lyric-variants';
+
 
 if (!process.env.OPENAI_API_KEY) {
   console.warn('[WARN] OPENAI_API_KEY is not set. /cast-spell will fail until you add it to .env');
@@ -45,7 +55,7 @@ app.get('/health', (_req, res) => {
   res.json({ ok: true, hasApiKey: !!process.env.OPENAI_API_KEY, model: MODEL });
 });
 
-// ------- Spell route (poetic, flowing; single length knob) -------
+// ------- Spell route (supports short | medium | long) -------
 app.post('/cast-spell', async (req, res) => {
   try {
     const body = req.body || {};
@@ -56,52 +66,118 @@ app.post('/cast-spell', async (req, res) => {
       return res.status(400).json({ error: 'No intention provided.' });
     }
 
-    // Length presets
+    // Length presets (word guidance + token caps)
     const lengthConfig = {
-      long:   { max_tokens: 260, guide: 'Length about 75 to 110 words.' },
-      medium: { max_tokens: 140, guide: 'Length about 45 to 65 words.' },
-      short:  { max_tokens:  80, guide: 'Length about 25 to 35 words.' }
+      short:  {
+        max_tokens: 140, // ~70–100 words
+        guide: [
+          'Length: ~70–100 words total.',
+          'Use 3–4 concise ritual steps; poem 6–8 lines.'
+        ].join(' ')
+      },
+      medium: {
+        max_tokens: 240, // ~120–160 words
+        guide: [
+          'Length: ~120–160 words total.',
+          'Use 4–6 concise ritual steps; poem 8–10 lines.'
+        ].join(' ')
+      },
+      long:   {
+        max_tokens: 340, // ~180–230 words
+        guide: [
+          'Length: ~180–230 words total.',
+          'Use 5–7 concise ritual steps; poem 10–12 lines.'
+        ].join(' ')
+      }
     };
-    const L = lengthConfig[length] || lengthConfig.long;
+    const L = lengthConfig[length] || lengthConfig.medium;
 
-    // SYSTEM MESSAGE — your updated text (ASCII-only, via join to avoid quote issues)
+    // SYSTEM MESSAGE
     const systemMsg = [
-      "You are CAULDRON, a web app designed for witches, shamans, and those who wish to manifest their will in the real world through the art of spellcraft and focused intention. Draw from the teachings of the Golden Dawn, the writings of Lon Milo DuQuette, and general knowledge about astrological and lunar cycles for tone and imagery.",
-      "",
-      "Write each response like a page torn from a grimoire: poetic, symbolic, mysterious, and actionable. Each response should contain a simple ritual action as well as a rhyming spell to be spoken aloud.",
-      "",
-      "When relevant, spells may reference generic deities such as The Gods, The Goddess, The Creator, and The Spirit.  Imply that our world is the playground of powerful gods, spirits and energies beyond human comprehension",
-      "",
-      "Make use of bold, dramatic, descriptive and symbolic language.   Give the impression of occult knowledge and ancient wisdom.",
-      "",
-      "Tone and safety: numinous, compassionate, and empowering. Do not suggest ingestion or self-harm. Do not suggest violence. No medical or illegal advice."
+      'You are CAULDRON — a poetic ritual-crafter with sly warmth, dreamlike lyricism, and mythic gravitas.',
+      'Write like a page torn from a grimoire: vivid, symbolic, mysterious, and actionable.',
+
+      'STYLE & SAFETY',
+      '- Tone: numinous, compassionate, empowering. Never dogmatic.',
+      '- Safety: no ingestion, no self-harm, no medical/legal advice, no fire left unattended; always offer a safe alternative for candles.',
+      "- Respect all traditions; keep references generic unless the user is specific (e.g., 'The Goddess', 'The Spirit').",
+
+      'CONTENT PALETTE (household-first):',
+      'candle (or LED), bowl of water, pinch of salt, small stone, string/twine, paper, pen, mirror, key, cup, bread/cracker, bell, simple incense (optional), breath, hands, window light.',
+      'If an item might be unavailable, offer a substitute in parentheses.',
+
+      'TROPES (draw 2–3 as fitting):',
+      '- Breath pattern (e.g., 4-4-4-4).',
+      '- Gesture/kinetic: tie a knot, trace a circle, tap three times.',
+      '- Invocation: address a generic divine/elemental presence.',
+      '- Sigil/lightwork: mark a simple symbol; imagine it glowing.',
+      '- Offering/grounding: a crumb of bread or a still moment by a window.',
+      '- Seal/close: extinguish, fold, or place the item somewhere specific.',
+
+      'POETIC VARIATION (choose ONE each response; do not announce):',
+      '- ABAB cross-rhyme (8–12 lines) OR',
+      '- AABB couplets (8–12 lines) OR',
+      '- Chant with refrain (repeat line 1 at lines 5 and last) OR',
+      '- Free-verse incantation (8–10 lines; no end-rhyme, strong internal echoes).',
+
+      'QUALITY GUARDRAILS',
+      '- Each ritual step should use at least one household item or breath/gesture.',
+      "- Avoid clichés like 'manifest your dreams' or 'positive vibes'.",
+      '- Prefer fresh, sensory imagery.'
     ].join('\n');
 
-    // USER MESSAGE — your updated brief plus length guidance
+    // USER MESSAGE
     const userMsg = [
-      'Your goal is to create a short, simple spell that seeks to achieve the following: "' + intent + '".',
-      'Your reply should start with the words "The Cauldron boils furiously, a thick smog fills the room as your answer materializes," followed by a short, ritual magick spell the user can perform to achieve their desired goal. Make safety a priority and do not suggest anything dangerous or harmful to the user or others. Utilize fun, poetic, witchy language laden with symbolism and metaphor, and when possible deliver your answer in poetic rhyme. The tone should walk the line between Lon Milo Duquette and Aleister Crowley.',
-      L.guide
+      `User intention: "${intent}"`,
+      '',
+      'Deliver exactly this arc in one flowing piece of text:',
+      '1) Echo the intention respectfully in one evocative line.',
+      '2) 3–7 concise ritual steps (≤12 words each), using household items or breath/gesture (count depends on length).',
+      '3) The spoken spell using ONE chosen poetic pattern (see system).',
+      '4) A brief visualization that shows the intention realized.',
+      '',
+      'Constraints:',
+      L.guide,
+      '- Offer safe alternatives for flames (e.g., LED/phone light).',
+      '- Avoid rare herbs, specific crystals, therapy/medical language, or moralizing.'
     ].join('\n');
 
     // OpenAI call
     const completion = await openai.chat.completions.create({
       model: MODEL,
-      temperature: 0.85,
+      temperature: 0.88,
       max_tokens: L.max_tokens,
+      presence_penalty: 0.5,
+      frequency_penalty: 0.2,
       messages: [
-        { role: 'system', content: systemMsg },
+        { role: 'system', content: systemMsg + `\n\nPROMPT_VERSION=${PROMPT_VERSION}` },
         { role: 'user', content: userMsg }
-      ],
-      presence_penalty: 0.3,
-      frequency_penalty: 0.2
+      ]
     });
 
     const spell =
-      (completion && completion.choices && completion.choices[0] && completion.choices[0].message && completion.choices[0].message.content || '').trim() ||
-      'The spirits whisper, but words fail to form.';
+      (completion &&
+       completion.choices &&
+       completion.choices[0] &&
+       completion.choices[0].message &&
+       completion.choices[0].message.content || '').trim()
+      || 'The spirits whisper, but words fail to form.';
 
     res.json({ spell });
+
+    // --- Save to database (async, non-blocking) ---
+db.query(
+  `INSERT INTO spells (intent, length, spell_text, ua, ip_hash)
+   VALUES ($1, $2, $3, $4, $5)`,
+  [
+    intent,
+    length,
+    spell,
+    req.get('user-agent') || '',
+    require('crypto').createHash('sha256').update(req.ip || '').digest('hex').slice(0,16)
+  ]
+).catch(err => console.error('DB insert failed:', err.message));
+
   } catch (e) {
     const log = {
       at: '/cast-spell (chat)',
@@ -113,6 +189,7 @@ app.post('/cast-spell', async (req, res) => {
     res.status(500).json({ error: log.data?.error?.message || log.message || 'OpenAI error' });
   }
 });
+
 
 // Subscribe route (ASCII-safe)
 app.post('/subscribe', (req, res) => {
