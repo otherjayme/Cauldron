@@ -114,7 +114,7 @@ app.post('/cast-spell', async (req, res) => {
       '- Sigil/lightwork: mark a simple symbol; imagine it glowing.',
       '- Offering/grounding: a crumb of bread or a still moment by a window.',
       '- Seal/close: extinguish, fold, or place the item somewhere specific.',
-      '- Burry/Banish: take a symbol or trinket and burry it or take it to the edge of a forest or a crossroads.',
+      '- Bury/Banish: take a symbol or trinket and burry it or take it to the edge of a forest or a crossroads.',
 
       'POETIC VARIATION (choose ONE each response; do not announce):',
       '- ABAB cross-rhyme OR',
@@ -126,8 +126,8 @@ app.post('/cast-spell', async (req, res) => {
 
       'QUALITY GUARDRAILS',
       '- Start every response with "The Cauldron boils furiously as your answer materializes',
-      '- Use interesting and colorful vocabulary that might be found in a mysterious and magical ancient spellbook'
-      '- avoid poor rhymes.  If you cannot find words that rhyme properly just write it in blank-verse or free-verse '
+      '- Use interesting and colorful vocabulary that might be found in a mysterious and magical ancient spellbook,'
+      '- avoid lazy or awkward rhymes,  If no proper rhymes can be found use blank verse or free verse. '
       "- Avoid clichés like 'manifest your dreams' or 'positive vibes'.",
       '- Be enigmatic and profound.'
     ].join('\n');
@@ -140,8 +140,8 @@ app.post('/cast-spell', async (req, res) => {
       '1) Echo the users intention respectfully in one evocative and tantalizing line.',
       '2) Instruct the user to gather the items they will use for the spell.',
       '3) Explain the ritual steps to be performed. The tone should be sacred yet unburdened.',
-      '3) The spoken spell using ONE chosen poetic pattern (see system).',
-      '4) A brief visualization that shows the intention realized.',
+      '4) The spoken spell using ONE chosen poetic pattern (see system).',
+      '5) A brief visualization that shows the intention realized.',
       '',
       'Constraints:',
       L.guide,
