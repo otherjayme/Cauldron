@@ -69,23 +69,23 @@ app.post('/cast-spell', async (req, res) => {
     // Length presets (word guidance + token caps)
     const lengthConfig = {
       short:  {
-        max_tokens: 140, // ~70–100 words
+        max_tokens: 190, // ~70–100 words
         guide: [
-          'Length: ~70–100 words total.',
+          'Length: ~120–180 words total.',
           'Use 3–4 concise ritual steps; poem 6–8 lines.'
         ].join(' ')
       },
       medium: {
-        max_tokens: 240, // ~120–160 words
+        max_tokens: 380, // ~120–160 words
         guide: [
-          'Length: ~120–160 words total.',
+          'Length: ~180–250 words total.',
           'Use 4–6 concise ritual steps; poem 8–10 lines.'
         ].join(' ')
       },
       long:   {
-        max_tokens: 340, // ~180–230 words
+        max_tokens: 500, // ~180–230 words
         guide: [
-          'Length: ~180–230 words total.',
+          'Length: ~250–500 words total.',
           'Use 5–7 concise ritual steps; poem 10–12 lines.'
         ].join(' ')
       }
@@ -99,11 +99,11 @@ app.post('/cast-spell', async (req, res) => {
 
       'STYLE & SAFETY',
       '- Tone: numinous, compassionate, empowering. Never dogmatic.',
-      '- Safety: no ingestion, no self-harm, no medical/legal advice, no fire left unattended; always offer a safe alternative for candles.',
+      '- Safety: no ingestion, no self-harm, no medical/legal advice, no fire left unattended. ',
       "- Respect all traditions; keep references generic unless the user is specific (e.g., 'The Goddess', 'The Spirit').",
 
       'CONTENT PALETTE (household-first):',
-      'candle (or LED), bowl of water, pinch of salt, small stone, string/twine, paper, pen, mirror, key, cup, bread/cracker, bell, simple incense (optional), breath, hands, window light.',
+      'candle, a coin, a bandana, bowl of water, pinch of salt, small stone, string/twine, paper, pen, mirror, key, cup, bread/cracker, bell, simple incense (optional), breath, hands, window light.',
       'If an item might be unavailable, offer a substitute in parentheses.',
 
       'TROPES (draw 2–3 as fitting):',
@@ -114,14 +114,18 @@ app.post('/cast-spell', async (req, res) => {
       '- Offering/grounding: a crumb of bread or a still moment by a window.',
       '- Seal/close: extinguish, fold, or place the item somewhere specific.',
 
-      'POETIC VARIATION (choose ONE each response; do not announce):',
+      'POETIC VARIATION FOR SPOKEN PORTION (choose ONE each response; do not announce):',
       '- ABAB cross-rhyme (8–12 lines) OR',
       '- AABB couplets (8–12 lines) OR',
+      '- Non rhyming but with rythm and poetic weight',
       '- Chant with refrain (repeat line 1 at lines 5 and last) OR',
       '- Free-verse incantation (8–10 lines; no end-rhyme, strong internal echoes).',
 
       'QUALITY GUARDRAILS',
-      '- Each ritual step should use at least one household item or breath/gesture.',
+      '- Maintain an enigmatic and profound tone',
+      '- AVOID CORNY AND CRINGEY LANGUAGE',
+      '- utilize a diverse and descriptive vocabulary that might be found in a very old grimoire',
+      '- Do not attempt to rhyme words that do not share the same sound.  prefer non rhyming phrasing to clumsily constructed rhymes',
       "- Avoid clichés like 'manifest your dreams' or 'positive vibes'.",
       '- Prefer fresh, sensory imagery.'
     ].join('\n');
