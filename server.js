@@ -62,6 +62,39 @@ app.post('/cast-spell', async (req, res) => {
     const intent = (body.intent || '').trim();
     const length = (body.length || 'medium').toLowerCase();
 
+    // NEW: pull in ingredients and run safety checks
+const ingredients = (body.ingredients || '').trim();
+
+// Expanded safety filter (simple substring check; we can upgrade later)
+const BANNED = [
+  // Weapons / self-harm
+  'gun','knife','blade','razor','razorblade','machete','sword','bullet','ammo',
+  'explosive','gunpowder','firework','noose','syringe',
+
+  // Hazardous substances
+  'acid','poison','bleach','ammonia','lye','gasoline','lighter fluid','matches',
+
+  // Biological hazards
+  'blood',
+
+  // Drugs & controlled substances (including prescriptions by name/category)
+  'drug','drugs','heroin','cocaine','meth','amphetamine','opioid','oxycontin',
+  'fentanyl','xanax','adderall','marijuana','weed','lsd','mushroom','shroom',
+  'prescription','pharmaceutical','narcotic','pill','tablet','capsule',
+
+  // Hate / prejudice symbols or materials
+  'swastika','kkk','klan','racist','white power','nazi','supremacist',
+  'confederate flag','hate symbol'
+];
+
+const unsafeHit = String(ingredients).toLowerCase() && BANNED.find(t => ingredients.toLowerCase().includes(t));
+if (unsafeHit) {
+  return res.status(400).json({
+    error: `For safety and inclusivity, Cauldron cannot use or reference “${unsafeHit}”. Please choose benign items like herbs, crystals, candles, colors, paper, string, salt, water, or stones.`
+  });
+}
+
+
     if (!intent) {
       return res.status(400).json({ error: 'No intention provided.' });
     }
@@ -129,6 +162,8 @@ app.post('/cast-spell', async (req, res) => {
       `User intention: "${intent}"`,
       '',
       'Include each of the following things in one flowing piece of text:',
+        `Available tools/ingredients (use only if safe & benign): ${ingredients || 'none specified'}`,
+  '',
       '1) Echo the users intention respectfully in one evocative and tantalizing line.',
       '2) Instruct the user to gather the items they will use for the spell.',
       '3) Explain the ritual steps to be performed. The tone should be sacred yet unburdened.',
