@@ -101,15 +101,15 @@ if (unsafeHit) {
 
     // Length presets (word guidance + token caps)
     const lengthConfig = {
-      short:  {
+      charm:  {
         max_tokens: 200, // ~90–180 words
-        guide: 'Length: ~90–180 words total. Use 1–2 simple ritual steps and a spoken poetic spell.'
+        guide: 'Length: ~90–180 words total. skip ritual steps and proceed right into a poetic spell.'
       },
-      medium: {
+      spell: {
         max_tokens: 350, // ~180–300 words
-        guide: 'Length: ~180–300 words total. Use 2–3 simple ritual steps and a spoken poetic spell.'
+        guide: 'Length: ~180–300 words total. Use 1–2 simple ritual steps and a spoken poetic spell.'
       },
-      long:   {
+      ritual:   {
         max_tokens: 500, // ~300–400 words
         guide: 'Length: ~300–400 words total. Use 3–4 simple ritual steps and a spoken poetic spell.'
       }
