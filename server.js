@@ -62,6 +62,18 @@ app.post('/cast-spell', async (req, res) => {
     const intent = (body.intent || '').trim();
     const length = (body.length || 'medium').toLowerCase();
 
+    // --- FIX: map front-end values (short / medium / long) to back-end keys ---
+    const lengthMap = {
+      short:  'charm',
+      medium: 'spell',
+      long:   'ritual',
+      charm:  'charm',
+      spell:  'spell',
+      ritual: 'ritual'
+    };
+    const lengthKey = lengthMap[length] || 'spell';
+
+
     // NEW: pull in ingredients and run safety checks
 const ingredients = (body.ingredients || '').trim();
 
@@ -114,7 +126,7 @@ if (unsafeHit) {
         guide: 'Length: ~300–400 words total. Use 3–4 simple ritual steps and a spoken poetic spell.'
       }
     };
-    const L = lengthConfig[length] || lengthConfig.medium;
+   const L = lengthConfig[lengthKey];
 
     // SYSTEM MESSAGE (unchanged from your version)
     const systemMsg = [
