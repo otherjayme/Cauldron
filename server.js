@@ -171,25 +171,24 @@ if (unsafeHit) {
       `PROMPT_VERSION=${PROMPT_VERSION}`
     ].join('\n');
 
-    // ✅ USER MESSAGE (this was missing before)
-    const userMsg = [
-      `User intention: "${intent}"`,
-      '',
-      'Include each of the following things in one flowing piece of text:',
-        `Available tools/ingredients (use only if safe & benign): ${ingredients || 'none specified'}`,
+const userMsg = [
+  `User intention: "${intent}"`,
   '',
-      '1) Echo the users intention respectfully in one evocative and tantalizing line.',
-      '2) Instruct the user to gather the items they will use for the spell.',
-      '3) Explain the ritual steps to be performed. The tone should be sacred yet unburdened.',
-      '3) The spoken spell using ONE chosen poetic pattern (see system).',
-      '4) A brief visualization that shows the intention realized.',
-      '',
-      'Constraints:',
-      L.guide,
-      '- Avoid rare herbs, specific crystals, therapy/medical language, or moralizing.'
-      '- End the response with the exact line: "So it is done."',
+  'Include each of the following things in one flowing piece of text:',
+  `Available tools/ingredients (use only if safe & benign): ${ingredients || 'none specified'}`,
+  '',
+  '1) Echo the users intention respectfully in one evocative and tantalizing line.',
+  '2) Instruct the user to gather the items they will use for the spell.',
+  '3) Explain the ritual steps to be performed. The tone should be sacred yet unburdened.',
+  '3) The spoken spell using ONE chosen poetic pattern (see system).',
+  '4) A brief visualization that shows the intention realized.',
+  '',
+  'Constraints:',
+  L.guide,
+  '- Avoid rare herbs, specific crystals, therapy/medical language, or moralizing.',
+  '- End the response with the exact line: "So it is done."',
+].join('\n');
 
-    ].join('\n');
 
 // --- Helper: check closing line ---
 function hasClosingLine(text) {
