@@ -115,7 +115,7 @@ if (unsafeHit) {
     const lengthConfig = {
       charm:  {
         max_tokens: 200, // ~90–180 words
-        guide: 'Length: ~90–180 words total. skip ritual steps and proceed right into a poetic spell.'
+        guide: 'Length: ~120–160 words total. skip ritual steps and proceed right into a poetic spell.'
       },
       spell: {
         max_tokens: 350, // ~180–300 words
@@ -166,6 +166,8 @@ if (unsafeHit) {
       '- Avoid lazy or awkward rhymes. If no proper rhymes can be found, use blank verse or free verse.',
       "- Avoid clichés like 'manifest your dreams' or 'positive vibes'.",
       '- Be enigmatic and profound.',
+      '- End the spell with the exact closing line: "So it is done." Do not finish before writing this line.',
+
       `PROMPT_VERSION=${PROMPT_VERSION}`
     ].join('\n');
 
@@ -185,31 +187,78 @@ if (unsafeHit) {
       'Constraints:',
       L.guide,
       '- Avoid rare herbs, specific crystals, therapy/medical language, or moralizing.'
+      '- End the response with the exact line: "So it is done."',
+
     ].join('\n');
 
-    // OpenAI call
-    const completion = await openai.chat.completions.create({
-      model: MODEL,
-      temperature: 0.88,
-      max_tokens: L.max_tokens,
-      presence_penalty: 0.5,
-      frequency_penalty: 0.2,
-      messages: [
-        { role: 'system', content: systemMsg },
-        { role: 'user', content: userMsg }
-      ]
-    });
+// --- Helper: check closing line ---
+function hasClosingLine(text) {
+  if (!text) return false;
+  // Accept "So it is done" with optional trailing period/whitespace, case-insensitive, at the very end
+  return /so it is done\.?\s*$/i.test(text.trim());
+}
 
-    const spell =
-      (completion &&
-       completion.choices &&
-       completion.choices[0] &&
-       completion.choices[0].message &&
-       completion.choices[0].message.content || '').trim()
-      || 'The spirits whisper, but words fail to form.';
+// --- First attempt ---
+let completion = await openai.chat.completions.create({
+  model: MODEL,
+  temperature: 0.88,
+  max_tokens: L.max_tokens,
+  presence_penalty: 0.5,
+  frequency_penalty: 0.2,
+  messages: [
+    { role: 'system', content: systemMsg },
+    { role: 'user',   content: userMsg }
+  ]
+});
 
-    // Send to client
-    res.json({ spell });
+let choice = completion.choices?.[0];
+let spell  = choice?.message?.content?.trim() || '';
+let cutOff = choice?.finish_reason === 'length';
+let okEnd  = hasClosingLine(spell);
+
+// --- If cut off OR missing ending, retry once with a shorter ask ---
+if (cutOff || !okEnd) {
+  console.warn('✂️ Spell truncated or missing closing line — retrying shorter.');
+  const retryMsg = [
+    userMsg,
+    '',
+    'The previous attempt was either cut off or did not end correctly.',
+    'Rewrite the entire spell in a shorter form that fits fully within the limit,',
+    'and MUST end with the exact line: "So it is done."'
+  ].join('\n');
+
+  const retry = await openai.chat.completions.create({
+    model: MODEL,
+    temperature: 0.85,
+    // shave a bit off to ensure it fits
+    max_tokens: Math.max(120, Math.floor(L.max_tokens * 0.9)),
+    presence_penalty: 0.4,
+    frequency_penalty: 0.2,
+    messages: [
+      { role: 'system', content: systemMsg },
+      { role: 'user',   content: retryMsg }
+    ]
+  });
+
+  choice = retry.choices?.[0];
+  spell  = choice?.message?.content?.trim() || spell; // fall back to first if somehow empty
+  cutOff = choice?.finish_reason === 'length';
+  okEnd  = hasClosingLine(spell);
+}
+
+// Final safety net: if we’re not cut off but the line is missing, append it.
+if (!cutOff && !okEnd) {
+  spell = (spell.trim().replace(/\s+$/, '')) + '\nSo it is done.';
+}
+
+// If still cut off after retry, give a graceful finish without lying
+if (cutOff) {
+  spell = (spell.trim().replace(/\s+$/, '')) + '\n…\nSo it is done.';
+}
+
+// Send to client
+res.json({ spell });
+
 
     // --- Save to database (async, non-blocking) ---
     db.query(
