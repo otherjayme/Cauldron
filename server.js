@@ -7,18 +7,9 @@ const fs = require('fs');
 const path = require('path');
 const OpenAI = require('openai');
 
-// --- Database setup ---
-const { Pool } = require('pg');
-const db = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
-
-
 const app = express();
+const port = process.env.PORT || 3000;
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-const PROMPT_VERSION = 'v1.3-lyric-variants';
-
 
 if (!process.env.OPENAI_API_KEY) {
   console.warn('[WARN] OPENAI_API_KEY is not set. /cast-spell will fail until you add it to .env');
@@ -29,7 +20,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 // Middleware
 // CORS allow-list: only let your frontends call the API
 const allowedOrigins = new Set([
-  'https://comforting-bombolone-26bfb7.netlify.app', // <- fixed (no double https, no trailing slash)
+  'https://https://comforting-bombolone-26bfb7.netlify.app/',
   'https://cauldron.online',
 ]);
 
@@ -55,235 +46,74 @@ app.get('/health', (_req, res) => {
   res.json({ ok: true, hasApiKey: !!process.env.OPENAI_API_KEY, model: MODEL });
 });
 
-// ------- Spell route (supports short | medium | long) -------
+// ------- Spell route (poetic, flowing; single length knob) -------
 app.post('/cast-spell', async (req, res) => {
   try {
     const body = req.body || {};
     const intent = (body.intent || '').trim();
-    const length = (body.length || 'medium').toLowerCase();
-
-    // --- FIX: map front-end values (short / medium / long) to back-end keys ---
-    const lengthMap = {
-      short:  'charm',
-      medium: 'spell',
-      long:   'ritual',
-      charm:  'charm',
-      spell:  'spell',
-      ritual: 'ritual'
-    };
-    const lengthKey = lengthMap[length] || 'spell';
-
-
-    // NEW: pull in ingredients and run safety checks
-const ingredients = (body.ingredients || '').trim();
-
-// Expanded safety filter (simple substring check; we can upgrade later)
-const BANNED = [
-  // Weapons / self-harm
-  'gun','knife','blade','razor','razorblade','machete','sword','bullet','ammo',
-  'explosive','gunpowder','firework','noose','syringe',
-
-  // Hazardous substances
-  'acid','poison','bleach','ammonia','lye','gasoline','lighter fluid','matches',
-
-  // Biological hazards
-  'blood',
-
-  // Drugs & controlled substances (including prescriptions by name/category)
-  'drug','drugs','heroin','cocaine','meth','amphetamine','opioid','oxycontin',
-  'fentanyl','xanax','adderall','marijuana','weed','lsd','mushroom','shroom',
-  'prescription','pharmaceutical','narcotic','pill','tablet','capsule',
-
-  // Hate / prejudice symbols or materials
-  'swastika','kkk','klan','racist','white power','nazi','supremacist',
-  'confederate flag','hate symbol'
-];
-
-const unsafeHit = String(ingredients).toLowerCase() && BANNED.find(t => ingredients.toLowerCase().includes(t));
-if (unsafeHit) {
-  return res.status(400).json({
-    error: `For safety and inclusivity, Cauldron cannot use or reference “${unsafeHit}”. Please choose benign items like herbs, crystals, candles, colors, paper, string, salt, water, or stones.`
-  });
-}
-
+    const length = (body.length || 'long').toLowerCase();
 
     if (!intent) {
       return res.status(400).json({ error: 'No intention provided.' });
     }
 
-    // Length presets (word guidance + token caps)
+    // Length presets
     const lengthConfig = {
-      charm:  {
-        max_tokens: 200, // ~90–180 words
-        guide: 'Length: ~120–160 words total. skip ritual steps and proceed right into a poetic spell.'
-      },
-      spell: {
-        max_tokens: 350, // ~180–300 words
-        guide: 'Length: ~180–300 words total. Use 1–2 simple ritual steps and a spoken poetic spell.'
-      },
-      ritual:   {
-        max_tokens: 500, // ~300–400 words
-        guide: 'Length: ~300–400 words total. Use 3–4 simple ritual steps and a spoken poetic spell.'
-      }
+      long:   { max_tokens: 260, guide: 'Length about 150 to 220 words.' },
+      medium: { max_tokens: 140, guide: 'Length about 75 to 110 words.' },
+      short:  { max_tokens:  80, guide: 'Length about 35 to 55 words.' }
     };
-   const L = lengthConfig[lengthKey];
+    const L = lengthConfig[length] || lengthConfig.long;
 
-    // SYSTEM MESSAGE (unchanged from your version)
+    // SYSTEM MESSAGE — your updated text (ASCII-only, via join to avoid quote issues)
     const systemMsg = [
-      'You are CAULDRON — a poetic ritual-crafter with sly warmth, dreamlike lyricism, and mythic gravitas.',
-      'Write like a page torn from a magical and mysterious grimoire: vivid, symbolic, mysterious, and actionable.',
-
-      'STYLE & SAFETY',
-      '- Tone: numinous, compassionate, empowering. Never dogmatic.',
-      '- Borrow themes and imagery from the tarot, astrology, classical mythology, and occult symbolism.',
-      '- Safety: no ingestion, no self-harm, no medical/legal advice, no fire left unattended.',
-      "- Respect all traditions; keep references generic unless the user is specific (e.g., 'The Goddess', 'The Shadow', 'The Spirit').",
-
-      'CONTENT PALETTE (household-first):',
-      'candle, coin, leaf, bowl of water, pinch of salt, small stone, string/twine, paper, pen, mirror, key, cup, bread/cracker, bell, simple incense (optional), breath, hands, window light.',
-      'Never include weapons, or dangerous items.',
-
-      'TROPES (draw 2–3 as fitting):',
-      '- Breath pattern (e.g., 4-4-4-4).',
-      '- Gesture/kinetic: tie a knot, trace a circle, tap three times.',
-      '- Invocation: address a generic divine/elemental presence.',
-      '- Sigil/lightwork: mark a simple symbol; imagine it glowing.',
-      '- Offering/grounding: a crumb of bread or a still moment by a window.',
-      '- Seal/close: extinguish, fold, or place the item somewhere specific.',
-      '- Bury/Banish: take a symbol or trinket and bury it or take it to the edge of a forest or a crossroads.',
-
-      'POETIC VARIATION (choose ONE each response; do not announce):',
-      '- ABAB cross-rhyme OR',
-      '- AABB couplets OR',
-      '- Blank verse iambic pentameter OR',
-      '- ABBA enclosed-rhyme OR',
-      '- 5-7-5 Haiku OR',
-      '- Free-verse incantation (8–10 lines; no end-rhyme, strong internal echoes).',
-
-      'QUALITY GUARDRAILS',
-      '- Start every response with "The Cauldron boils furiously as your answer materializes".',
-      '- Use interesting and colorful vocabulary that might be found in a mysterious and magical ancient spellbook.',
-      '- Avoid lazy or awkward rhymes. If no proper rhymes can be found, use blank verse or free verse.',
-      "- Avoid clichés like 'manifest your dreams' or 'positive vibes'.",
-      '- Be enigmatic and profound.',
-      '- End the spell with the exact closing line: "So it is done." Do not finish before writing this line.',
-
-      `PROMPT_VERSION=${PROMPT_VERSION}`
+      "You are Cauldron, an occult ritual-crafter steeped in Western esoterica: Golden Dawn, Wicca, Hermeticism, and planetary magic. Your voice blends Lon Milo DuQuette's sly warmth, Neil Gaiman's dreamlike lyricism, and J. R. R. Tolkien's mythic gravitas.",
+      "",
+      "Write each response like a page torn from a grimoire: poetic, symbolic, mysterious, and actionable.",
+      "",
+      "First relay back the intention of the spell and praise the user for pursuing their will. Next describe a series of simple accessible ritual actions for the user to perform. Next instruct them to speak aloud a poetic magical spell designed to achieve the intention input by the user. The spoken spell should follow an ABAB rhyming patern.",
+      "When relevant utilize ordinary household materials such as a candle to symbolize fire, a stone to symbolize earth, a vessel to symbolize water, incense to symbolize air.",
+      "",
+      "Tone and safety: numinous, compassionate, and empowering; never dogmatic. Avoid cliche and modern filler. No ingestion. No medical or illegal advice."
     ].join('\n');
 
-const userMsg = [
-  `User intention: "${intent}"`,
-  '',
-  'Include each of the following things in one flowing piece of text:',
-  `Available tools/ingredients (use only if safe & benign): ${ingredients || 'none specified'}`,
-  '',
-  '1) Echo the users intention respectfully in one evocative and tantalizing line.',
-  '2) Instruct the user to gather the items they will use for the spell.',
-  '3) Explain the ritual steps to be performed. The tone should be sacred yet unburdened.',
-  '3) The spoken spell using ONE chosen poetic pattern (see system).',
-  '4) A brief visualization that shows the intention realized.',
-  '',
-  'Constraints:',
-  L.guide,
-  '- Avoid rare herbs, specific crystals, therapy/medical language, or moralizing.',
-  '- End the response with the exact line: "So it is done."',
-].join('\n');
+    // USER MESSAGE — your updated brief plus length guidance
+    const userMsg = [
+      'Compose a single flowing ritual based on this user input "' + intent + '".',
+      'Follow this arc, relay back the intention of the spell, then describe a series of simple accesible ritual actions for the user to perform. Next instruct them to speak aloud a poetic magical spell designed to achieve the intention input by the user. The spoken spell should follow an ABAB rhyming pattern. Finally verbally construct a vivid visual image of the intention manifesting into reality.',
+      L.guide
+    ].join('\n');
 
+    // OpenAI call
+    const completion = await openai.chat.completions.create({
+      model: MODEL,
+      temperature: 0.85,
+      max_tokens: L.max_tokens,
+      messages: [
+        { role: 'system', content: systemMsg },
+        { role: 'user', content: userMsg }
+      ],
+      presence_penalty: 0.3,
+      frequency_penalty: 0.2
+    });
 
-// --- Helper: check closing line ---
-function hasClosingLine(text) {
-  if (!text) return false;
-  // Accept "So it is done" with optional trailing period/whitespace, case-insensitive, at the very end
-  return /so it is done\.?\s*$/i.test(text.trim());
-}
+    const spell =
+      (completion && completion.choices && completion.choices[0] && completion.choices[0].message && completion.choices[0].message.content || '').trim() ||
+      'The spirits whisper, but words fail to form.';
 
-// --- First attempt ---
-let completion = await openai.chat.completions.create({
-  model: MODEL,
-  temperature: 0.88,
-  max_tokens: L.max_tokens,
-  presence_penalty: 0.5,
-  frequency_penalty: 0.2,
-  messages: [
-    { role: 'system', content: systemMsg },
-    { role: 'user',   content: userMsg }
-  ]
-});
-
-let choice = completion.choices?.[0];
-let spell  = choice?.message?.content?.trim() || '';
-let cutOff = choice?.finish_reason === 'length';
-let okEnd  = hasClosingLine(spell);
-
-// --- If cut off OR missing ending, retry once with a shorter ask ---
-if (cutOff || !okEnd) {
-  console.warn('✂️ Spell truncated or missing closing line — retrying shorter.');
-  const retryMsg = [
-    userMsg,
-    '',
-    'The previous attempt was either cut off or did not end correctly.',
-    'Rewrite the entire spell in a shorter form that fits fully within the limit,',
-    'and MUST end with the exact line: "So it is done."'
-  ].join('\n');
-
-  const retry = await openai.chat.completions.create({
-    model: MODEL,
-    temperature: 0.85,
-    // shave a bit off to ensure it fits
-    max_tokens: Math.max(120, Math.floor(L.max_tokens * 0.9)),
-    presence_penalty: 0.4,
-    frequency_penalty: 0.2,
-    messages: [
-      { role: 'system', content: systemMsg },
-      { role: 'user',   content: retryMsg }
-    ]
-  });
-
-  choice = retry.choices?.[0];
-  spell  = choice?.message?.content?.trim() || spell; // fall back to first if somehow empty
-  cutOff = choice?.finish_reason === 'length';
-  okEnd  = hasClosingLine(spell);
-}
-
-// Final safety net: if we’re not cut off but the line is missing, append it.
-if (!cutOff && !okEnd) {
-  spell = (spell.trim().replace(/\s+$/, '')) + '\nSo it is done.';
-}
-
-// If still cut off after retry, give a graceful finish without lying
-if (cutOff) {
-  spell = (spell.trim().replace(/\s+$/, '')) + '\n…\nSo it is done.';
-}
-
-// Send to client
-res.json({ spell });
-
-
-    // --- Save to database (async, non-blocking) ---
-    db.query(
-      `INSERT INTO spells (intent, length, spell_text, ua, ip_hash)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [
-        intent,
-        length,
-        spell,
-        req.get('user-agent') || '',
-        require('crypto').createHash('sha256').update(req.ip || '').digest('hex').slice(0,16)
-      ]
-    ).catch(err => console.error('DB insert failed:', err.message));
-
+    res.json({ spell });
   } catch (e) {
-    const log = {
-      at: '/cast-spell (chat)',
-      status: e?.status || e?.response?.status,
-      message: e?.message,
-      data: e?.response?.data || null
-    };
-    console.error('Chat error ->', log);
-    res.status(500).json({ error: log.data?.error?.message || log.message || 'OpenAI error' });
-  }
-});
+  const log = {
+    at: '/cast-spell (chat)',
+    status: e?.status || e?.response?.status,
+    message: e?.message,
+    data: e?.response?.data || null
+  };
+  console.error('Chat error ->', log);
+  res.status(500).json({ error: log.data?.error?.message || log.message || 'OpenAI error' });
+}
 
+});
 
 // Subscribe route (ASCII-safe)
 app.post('/subscribe', (req, res) => {
@@ -325,3 +155,4 @@ const server = app.listen(PORT, () => {
   const actualPort = typeof addr === 'string' ? addr : addr?.port;
   console.log(`Cauldron server brewing on port ${actualPort}`);
 });
+
